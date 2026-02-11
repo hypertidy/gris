@@ -1,0 +1,59 @@
+---
+title: "TopoJSON"
+author: "Michael Sumner"
+date: "15/01/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## What is TopoJSON?
+
+
+
+```{r}
+url <- "https://raw.githubusercontent.com/shawnbot/d3-cartogram/master/data/us-states.topojson"
+
+
+library(leaflet)
+leaflet() %>% addGeoJSONv2(readLines(url))
+## jsonlite does a weird simplify thing where a could-be-dimensioned array
+## might be [1, 5] or [5, 1, 1] but for TopoJSON we can just treat all
+## child-of-geometry arc arrays as 1D
+## but then why is the coordinates also called "arcs"
+x <- jsonlite::fromJSON(url, simplifyVector = FALSE)
+names(x)
+x$type
+x$transform
+names(x$objects)
+lapply(x$objects, "[", "type")
+
+lapply(x$objects, function(x) unique(x$geometries$type))
+
+lapply(x$objects, function(x) length(x$geometries$arcs))
+
+unlist(range(lapply(x$arcs, nrow)))
+unique(range(lapply(x$arcs, ncol)))
+
+str(x)
+```
+
+So the `x$arcs` are the coordinates, and must be qualified by transform. 
+
+```{r}
+coords_integer <- do.call(rbind, x$arcs) 
+vec2mat <- function(x, n) matrix(rep(x, each = n), ncol = length(x))
+coords <- vec2mat(x$transform$scale, nrow(coords_integer)) * coords_integer + vec2mat(x$transform$translate, nrow(coords_integer))
+library(dplyr)
+arcs_obj1 <- bind_rows(lapply(x$objects[[1]]$geometries$arcs, 
+                              function(x) {
+                                if (is.recursive(x)) x <- x[[1]]
+                                tibble(a = as.vector(x))})
+                       , .id = "geometry")
+
+plot(coords)
+lapply(split(arcs_obj1, arcs_obj1$geometry), function(x) lines(coords[x$a + 1, ]))
+```
+

@@ -1,0 +1,47 @@
+---
+title: "Reprojecting spatial data automatically"
+author: "Michael Sumner"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{automatic-reprojection}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+## Summary
+
+Automatic reprojection is absolutely fine, but it's not always going to work properly in a number 
+of different ways. These aren't mutually exclusive, but come down to either the CRS metadata or the actual
+topology of the line segments that link the raw coordinates, their arrangement and distribution and relation
+to the space in which they are operated on. 
+
+1) the data has no projection set (NA), not much we can do (and we shouldn't guess, it might be in the long-lat range but we have no idea of the datum, and it might be in different units anyway)
+2) the data has its CRS set, but it's wrong (nothing we can do, it's not possible to auto-check this)
+
+Both of those scenarios are the responsibility of the user, and it both case they need to  to find the right CRS and set it. 
+
+3) The data has its CRS set, but it's not on WGS84. In this case reprojection either needs the toWGS84 params, or the extra installed
+datum files for GDAL to do datum transformation. 
+
+4) The data has coordinates that are out of bounds in the target, e.g. the dummy seam at the south pole for Antarctica
+in longlat, this coordinate/line-segment is undefined in Mercator and degenerate in many projections (two identical coordinates
+with a zero-length segment). 
+
+5) The data is cut along a seam or not cut along a seam, i.e. the dateline. These are the wrapping problems, but they can manifest in several different ways. 
+
+6) Insufficient curvature along segments to carry over to another projection (great circles, parallels, lines of constant bearing, ... ) generally this is about what does "straight line" mean in this CRS, and what does it mean to transform it to another CRS. In ggplot2 this dealt with in non-geo forms with "coord_munch" that segmentizes line segments (adds redundant vertices so the curve is carried through when transformed). Mike bostock flawed example ...
+
+7) Raster reprojection is slightly different ...
+
+Relation to TopoJSON and rmapshaper, other packages that auto project, e.g. raster, oce, (there are many examples). 
+
+Finally, all of this can be dealt with from a "finite element perspective" ... but it's for the future and impacts more broadly than the "should we reproject" issue. 
+
+The danger in 2) is that we might reproject their data but the source was completely wrong, so we make it worse. 
+
+The danger in 3) is that the toWGS84 params are missing, or incorrect, or that a reprojection operation simply assumed it was WGS84. We get some
+inaccuracies in the locations and poor provenance on that situation for downstream uses. 
+
+
+

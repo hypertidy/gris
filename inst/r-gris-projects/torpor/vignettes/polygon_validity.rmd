@@ -1,0 +1,89 @@
+---
+title: "Polygon self-intersections"
+author: "Michael Sumner"
+date: "4 February 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+My reading of 6.1.11.1 within the simple features standard http://www.opengeospatial.org/standards/sfa says that a polygon ring can 
+intersect with itself at a point, so long as no neighbouring vertices to the point are also intersected. I.e. it's a single-vertex "touch", 
+not a shared-edge touch. 
+
+But, it seems a single ring in the  boundary cannot touch itself, but a boundary composed of multiple rings can touch another ring, but only at a point. I think the standard is a little ambiguous here, the PostGIS documentation and a blog post below confirm the behaviour of GEOS validity tests. 
+
+The standard shows examples to illustrate. The PostGIS documentation shows similar illustrations, but has one not illustrated in the standard. 
+
+The PostGIS documentation http://postgis.net/docs/using_postgis_dbmanagement.html, with example (i) within 4.3.5 is equivalent to this: 
+
+```{r}
+p <- rbind(
+  c(0, 0), 
+  c(0, 4), 
+  c(4, 4), 
+  c(4, 0), 
+  c(0, 0), 
+  c(2, 1), 
+  c(1, 2), 
+  c(0, 0)
+)
+library(sf)
+pp <- st_polygon(list(p))
+plot(pp)
+st_is_valid(pp)
+```
+
+This page says that the triangle should be an interior ring, with one intersection point on the outer ring. 
+
+https://3d.bk.tudelft.nl/hledoux/blog/your-polygons-the-same/
+
+> the triangle should be represented as an interior boundary touching the exterior boundary
+
+Rebuild pp to be with an interior ring. 
+
+
+```{r}
+idx <- list(c(1, 2, 3, 4, 5), 
+            c(5, 6, 7, 5))
+
+p2 <- st_polygon(lapply(idx, function(a) p[a, ]))
+
+ plot(p2)  
+ st_is_valid(p2)
+```
+
+Can we fix the first attempt? 
+
+```{r}
+(pfix <- st_union(sfdct::ct_triangulate(pp)))
+
+plot(pfix, col = "grey")
+
+st_is_valid(pfix)
+
+```
+
+
+## Can we use this?
+
+```{r,eval=FALSE}
+library(rworldxtra)
+data(countriesHigh)
+sf_ch <- st_as_sf(countriesHigh)
+ok <- st_is_valid(sf_ch)
+rebuild_ch <- sf_ch
+if (any(!ok)) {
+ ## sf has no triangular mesh, so explode into 
+ ## a GEOMETRYCOLLECTION of triangle POLYGONs
+ tri_ch <- sfdct::ct_triangulate(sf_ch[which(!ok), ])
+ mp_ch <- st_union(tri_ch)
+ 
+ ## and then union those into MULTIPOLYGONs again
+
+ rebuild_ch[!ok, ] <- mp_ch
+}
+st_is_valid(rebuild_ch)
+```
