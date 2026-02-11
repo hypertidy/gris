@@ -1,0 +1,64 @@
+---
+title: "Grid vs Cell registration"
+author: "Michael Sumner, Ben Raymond"
+date: "July 27, 2015"
+output: html_document
+---
+
+Grids can be registered in one of two ways: 
+
+* grid (or node) registration
+* cell registration. 
+
+Sometimes the distinction doesn't matter, but ...
+
+The Etopo1 global topography data set is delivered in either cell or grid, bu
+
+
+# Law dome
+
+```{r}
+etopo1home <- "D:/data/topography/Etopo1"
+library(raster)
+grid <- raster(file.path(etopo1home, "ETOPO1_Ice_g_geotiff.tif"))
+cell <- raster(file.path(etopo1home, "ETOPO1_Ice_c_geotiff.tif"))
+pt <- rev(c(-66.733333, 112.833333))
+ext <- extent(c(matrix(pt + c(-1, -1, 1, 1) * c(0.5, 0.4), byrow = TRUE, ncol = 2)))
+
+plot(crop(grid, ext, snap = "out"), col = palr::sstPal(50), asp = 1)
+```
+
+Convert to rgl format and plot. 
+
+```{r}
+library(rgl)
+library(gris)
+if(FALSE) {
+  rgl.pop()
+}
+
+sfact <- 5e3
+ggl <- bgl(crop(grid, ext, snap = "out"), crop(grid, ext, snap = "out")/sfact)
+scl <- function(x) (x - min(x))/diff(range(x))
+shade3d(ggl, col = rep(palr::sstPal(256)[scl(values(crop(grid, ext, snap = "out"))) * 255 + 1], each = 4))
+cgl <- bgl(crop(cell, ext, snap = "out"), crop(cell, ext, snap = "out")/sfact)
+shade3d(cgl, col = rep(palr::sstPal(256)[scl(values(crop(grid, ext, snap = "out"))) * 255 + 1], each = 4))
+
+gpts <- rasterToPoints(crop(grid, ext, snap = "out")/sfact)
+rgl.points(gpts[,1], gpts[,2], gpts[,3], col = "black")
+gpts <- gris(rasterToPoints(crop(grid, ext, snap = "out"), spatial = TRUE))
+gpoly <- gris(rasterToPolygons(crop(grid, ext, snap = "out")))
+pslgpoly <- mkpslg(gpoly)
+with(pslgpoly, apply(S[1:4, ], 1, function(x) rgl.lines(P[x, ])))
+ps <- pslg(P = as.matrix(gpts$v[, c("x", "y")]))
+
+ allv <- gpoly$bXv  %>% inner_join(gpoly$v, c(".vx0" = ".vx0"))  %>% inner_join(gpoly$b)  %>% inner_join(gpoly$oXb)  %>% inner_join(gpoly$o)
+ 
+ for (j in unique(allv$.ob0)) {
+   with(filter(allv, .ob0 == j), rgl.quads(x, y, ETOPO1_Ice_g_geotiff/2e3))
+   }
+ 
+rgl.points(gpts$o$x, gpts$o$y, gpts$o$ETOPO1_Ice_g_geotiff/2e3, col = "black")
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

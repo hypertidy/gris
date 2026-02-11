@@ -1,0 +1,36 @@
+---
+title: "rgl and rasters"
+author: "Michael Sumner"
+date: "14 June 2015"
+output: html_document
+---
+
+Create a WebGL scene from the NASA Blue Marble, and Etopo1. 
+
+```{r,eval=FALSE}
+
+library(raster)
+library(rgl)
+library(rglgris)
+f <- "E:\\DATA\\NASA\\world.topo.bathy.200411.3x21600x21600.D2_10.tif"
+
+esource <- readAll(crop(raster("E:\\DATA\\Etopo\\Etopo1Ice\\Etopo1.tif"), extent(90, 180, -90, 0)))
+
+
+r <- readAll(brick(f))
+extent(r) <- extent(90, 180, -90, 0) 
+smashimate <- function(x, smash) {dim(x) <- dim(x)/smash; x}
+
+sm <-smashimate(r, 40)
+rs <- setValues(sm, extract(r, coordinates(sm), method = "simple"))
+cols <- brick2col(rs)
+
+ro <- bgl(rs, z = esource)
+ro$vb[1:3,] <- t(llh2xyz(t(ro$vb[1:3,]), exag = 30))
+shade3d(ro, col = rep(cols, each = 4), lit = FALSE)
+writeWebGL(dir = "inst/example")
+```
+
+```{r,eval=FALSE}
+file.show(system.file("example", "index.html", package = "rglgris"))
+```
